@@ -1,0 +1,116 @@
+---
+title: "Modeling in R"
+output: html_notebook
+---
+
+The Caret Package provides many machine learning models. Install and import:
+
+```{r}
+install.packages("caret", dependencies = c("Depends", "Suggests"))
+library(caret)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+### Load Data
+
+```{r}
+data("iris")
+
+dataset <- iris
+
+dataset
+```
+
+### Exploratory Data Analysis
+```{r}
+
+
+par(mfrow = c(1,4))
+  for(i in 1:4) {
+    boxplot(dataset[,i], main=names(iris)[i])
+  }
+# descriptive statistics
+summary(iris)
+
+```
+
+Grouping by Iris type
+```{r}
+library(ggplot2)
+par(mfrow= c(1,4))
+  for(i in 1:4){
+    boxplot(dataset[,i]~dataset$Species, main=names(iris)[i])
+  }
+
+```
+
+Looks like petal length and width are good indicators of the setosa species
+
+Pairplot matrix
+
+```{r}
+featurePlot(x=dataset[,1:4], y=dataset[,5],plot="ellipse")
+```
+
+### Train Test Split
+```{r}
+validation_index <- createDataPartition(dataset$Species, p=.75, list=FALSE)
+train <- dataset[validation_index,]
+test <- dataset[-validation_index,]
+```
+
+### Modeling
+
+First set up cross validation and pick metric
+```{r}
+cv <- trainControl(method = "cv", number = 5)
+metric <- "Accuracy"
+```
+
+Create models
+```{r}
+# linear discriminant analysis (lda)
+set.seed(123)
+fit.lda <- train(Species~., data=train, method= "lda", metric = metric, trControl = cv)
+
+# Classification (and Regression) Trees
+set.seed(123)
+fit.cart <- train(Species~., data=train, method= "rpart", metric = metric, trControl = cv)
+
+# k Nearest Neighbors
+set.seed(123)
+fit.knn <- train(Species~., data=train, method= "knn", metric = metric, trControl = cv)
+
+# Support Vector Machine 
+set.seed(123)
+fit.svm <- train(Species~., data=train, method= "svmRadial", metric = metric, trControl = cv)
+
+#  Random Forrest
+set.seed(123)
+fit.rf <- train(Species~., data=train, method= "rf", metric = metric, trControl = cv)
+
+
+# print results
+results <- resamples(list(lda = fit.lda, cart = fit.cart, knn = fit.knn, svm = fit.svm, rf = fit.rf))
+summary(results)
+```
+Looks like the linear model did best, but all are highly accurate. Let's check visually
+```{r}
+dotplot(results)
+```
+
+Show best model metrics
+```{r}
+print(fit.lda)
+```
+Predict on test set
+```{r}
+predictions <- predict(fit.lda, test)
+confusionMatrix(predictions,test$Species)
+```
+Model gets 2 incorrect but accuracy doesn't drop too much overall from train to test.
